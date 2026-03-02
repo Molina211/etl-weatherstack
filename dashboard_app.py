@@ -48,15 +48,24 @@ try:
 
     # Sidebar con filtros
     st.sidebar.title("🔧 Filtros")
-    
+
+    if df.empty:
+        st.warning("⚠️ No hay datos en la base de datos. Ejecuta primero el extractor.")
+        st.info("💡 Ejecuta: `python scripts/extractor_db.py`")
+        st.stop()
+
     ciudades_filtro = st.sidebar.multiselect(
         "Selecciona Ciudades:",
         options=df['Ciudad'].unique(),
         default=df['Ciudad'].unique()
     )
-    
+
     # Filtra datos
     df_filtrado = df[df['Ciudad'].isin(ciudades_filtro)]
+
+    if df_filtrado.empty:
+        st.warning("⚠️ No hay datos con los filtros seleccionados. Selecciona al menos una ciudad.")
+        st.stop()
 
     # Métricas principales en columnas
     st.subheader("📈 Métricas Principales")
@@ -79,7 +88,8 @@ try:
 
     with col3:
         viento_maximo = df_filtrado['Viento'].max()
-        ciudad_viento = df_filtrado[df_filtrado['Viento'] == viento_maximo]['Ciudad'].values[0]
+        ciudad_viento_series = df_filtrado[df_filtrado['Viento'] == viento_maximo]['Ciudad'].values
+        ciudad_viento = ciudad_viento_series[0] if len(ciudad_viento_series) > 0 else "N/A"
         st.metric(
             label="💨 Viento Máximo",
             value=f"{viento_maximo:.1f} km/h",
@@ -97,7 +107,7 @@ try:
 
     # Gráficas
     st.subheader("📉 Visualizaciones")
-    
+
     col1, col2 = st.columns(2)
 
     # Gráfica 1: Temperatura por Ciudad
@@ -126,7 +136,7 @@ try:
 
     # Gráfica 3: Scatter Temperatura vs Humedad
     col1, col2 = st.columns(2)
-    
+
     with col1:
         fig_scatter = px.scatter(
             df_filtrado,
