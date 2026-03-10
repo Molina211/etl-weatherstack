@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import os
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -40,9 +41,9 @@ def _postgres_url():
 
 
 def _create_sqlite_engine():
-    repo_root = Path(__file__).resolve().parents[1]
-    fallback_db = repo_root / "data" / "weatherstack.db"
-    fallback_db.parent.mkdir(parents=True, exist_ok=True)
+    base_dir = Path(os.getenv("SQLITE_DB_DIR") or tempfile.gettempdir()).expanduser()
+    base_dir.mkdir(parents=True, exist_ok=True)
+    fallback_db = base_dir / "weatherstack.db"
     engine = create_engine(f"sqlite:///{fallback_db}", echo=False, future=True)
     logger.info("Base SQLite local lista en %s", fallback_db)
     return engine, f"sqlite:///{fallback_db}"
