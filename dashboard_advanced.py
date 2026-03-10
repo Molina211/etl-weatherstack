@@ -27,84 +27,69 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Vista General", "📈 Histórico", "🔍
 
 with tab1:
     st.subheader("Datos Actuales")
-
+    
     col1, col2, col3 = st.columns(3)
-
+    
     with col1:
         ciudades_count = db.query(func.count(Ciudad.id)).scalar()
         st.metric("🏙️ Ciudades", ciudades_count)
-
+    
     with col2:
         registros_count = db.query(func.count(RegistroClima.id)).scalar()
         st.metric("📊 Registros Totales", registros_count)
-
+    
     with col3:
         ultima_fecha = db.query(func.max(RegistroClima.fecha_extraccion)).scalar()
-        if ultima_fecha:
-            st.metric("⏰ Última Actualización", ultima_fecha.strftime("%Y-%m-%d %H:%M"))
-        else:
-            st.metric("⏰ Última Actualización", "Sin datos")
-
+        st.metric("⏰ Última Actualización", ultima_fecha.strftime("%Y-%m-%d %H:%M"))
+    
     st.markdown("---")
-
-    # ✅ CORRECCIÓN: obtener último registro por ciudad usando subquery
-    subquery = (
-        db.query(
-            RegistroClima.ciudad_id,
-            func.max(RegistroClima.fecha_extraccion).label("ultima_fecha")
-        )
-        .group_by(RegistroClima.ciudad_id)
-        .subquery()
-    )
-
-    registros_actuales = (
-        db.query(
-            Ciudad.nombre,
-            RegistroClima.temperatura,
-            RegistroClima.humedad,
-            RegistroClima.velocidad_viento,
-            RegistroClima.descripcion
-        )
-        .join(Ciudad, Ciudad.id == RegistroClima.ciudad_id)
-        .join(subquery, (subquery.c.ciudad_id == RegistroClima.ciudad_id) &
-                        (subquery.c.ultima_fecha == RegistroClima.fecha_extraccion))
-        .all()
-    )
-
+    
+    # Obtén datos actuales
+    registros_actuales = db.query(
+        Ciudad.nombre,
+        RegistroClima.temperatura,
+        RegistroClima.humedad,
+        RegistroClima.velocidad_viento,
+        RegistroClima.descripcion
+    ).join(Ciudad).order_by(
+        RegistroClima.ciudad_id,
+        RegistroClima.fecha_extraccion.desc()
+    ).distinct(RegistroClima.ciudad_id).all()
+    
     df_actual = pd.DataFrame(registros_actuales, columns=[
         'Ciudad', 'Temperatura', 'Humedad', 'Viento', 'Descripción'
     ])
-
-    if df_actual.empty:
-        st.warning("⚠️ No hay datos disponibles.")
-    else:
-        col1, col2 = st.columns(2)
-
-        with col1:
-            fig = px.bar(df_actual, x='Ciudad', y='Temperatura',
-                        title='Temperatura Actual', color='Temperatura',
-                        color_continuous_scale='RdYlBu_r')
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col2:
-            fig = px.pie(df_actual, values='Humedad', names='Ciudad',
-                        title='Distribución de Humedad')
-            st.plotly_chart(fig, use_container_width=True)
-
-        st.markdown("---")
-        st.dataframe(df_actual, use_container_width=True)
+    
+    # Gráficas lado a lado
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig = px.bar(df_actual, x='Ciudad', y='Temperatura',
+                    title='Temperatura Actual', color='Temperatura',
+                    color_continuous_scale='RdYlBu_r')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        fig = px.pie(df_actual, values='Humedad', names='Ciudad',
+                    title='Distribución de Humedad')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    st.dataframe(df_actual, use_container_width=True)
 
 with tab2:
     st.subheader("Análisis Histórico")
-
+    
+    # Rango de fechas
     col1, col2 = st.columns(2)
-
+    
     with col1:
         fecha_inicio = st.date_input("Desde:", value=datetime.now() - timedelta(days=7))
-
+    
     with col2:
         fecha_fin = st.date_input("Hasta:", value=datetime.now())
-
+    
+    # Filtra por fechas
     registros_historicos = db.query(
         RegistroClima,
         Ciudad.nombre
@@ -112,7 +97,7 @@ with tab2:
         RegistroClima.fecha_extraccion >= fecha_inicio,
         RegistroClima.fecha_extraccion <= fecha_fin
     ).all()
-
+    
     if registros_historicos:
         data = []
         for registro, ciudad_nombre in registros_historicos:
@@ -123,14 +108,15 @@ with tab2:
                 'Humedad': registro.humedad,
                 'Viento': registro.velocidad_viento
             })
-
+        
         df_historico = pd.DataFrame(data)
-
+        
+        # Gráfica de temperatura en el tiempo
         fig = px.line(df_historico, x='Fecha', y='Temperatura',
                      color='Ciudad', title='Temperatura en el Tiempo',
                      markers=True)
         st.plotly_chart(fig, use_container_width=True)
-
+        
         st.markdown("---")
         st.dataframe(df_historico, use_container_width=True)
     else:
@@ -138,20 +124,21 @@ with tab2:
 
 with tab3:
     st.subheader("Análisis Estadístico")
-
+    
+    # Estadísticas por ciudad
     ciudades = db.query(Ciudad).all()
-
+    
     for ciudad in ciudades:
         with st.expander(f"📍 {ciudad.nombre}"):
             registros = db.query(RegistroClima).filter_by(ciudad_id=ciudad.id).all()
-
+            
             if registros:
                 temps = [r.temperatura for r in registros]
                 humeds = [r.humedad for r in registros]
                 vientos = [r.velocidad_viento for r in registros]
-
+                
                 col1, col2, col3, col4 = st.columns(4)
-
+                
                 with col1:
                     st.metric("🌡️ Temp Prom.", f"{sum(temps)/len(temps):.1f}°C")
                 with col2:
@@ -160,16 +147,14 @@ with tab3:
                     st.metric("💨 Viento Prom.", f"{sum(vientos)/len(vientos):.1f} km/h")
                 with col4:
                     st.metric("📊 Registros", len(registros))
-            else:
-                st.info("Sin registros para esta ciudad.")
 
 with tab4:
     st.subheader("Métricas de Ejecución ETL")
-
+    
     metricas = db.query(MetricasETL).order_by(
         MetricasETL.fecha_ejecucion.desc()
     ).limit(20).all()
-
+    
     if metricas:
         data = []
         for m in metricas:
@@ -181,18 +166,19 @@ with tab4:
                 'Fallidos': m.registros_fallidos,
                 'Tiempo (s)': f"{m.tiempo_ejecucion_segundos:.2f}"
             })
-
+        
         df_metricas = pd.DataFrame(data)
         st.dataframe(df_metricas, use_container_width=True)
-
+        
+        # Gráficas de métricas
         col1, col2 = st.columns(2)
-
+        
         with col1:
             fig = px.bar(df_metricas, x='Fecha', y='Guardados',
                         title='Registros Guardados por Ejecución',
                         color='Estado')
             st.plotly_chart(fig, use_container_width=True)
-
+        
         with col2:
             fig = px.scatter(df_metricas, x='Fecha', y='Tiempo (s)',
                            size='Guardados', title='Duración de Ejecuciones',

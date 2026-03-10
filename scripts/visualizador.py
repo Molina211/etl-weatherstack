@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import pandas as pd
 import matplotlib.pyplot as plt
-import logging as logger
 import numpy as np
 
 # Cargar datos

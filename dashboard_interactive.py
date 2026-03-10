@@ -19,14 +19,14 @@ st.set_page_config(
 
 # CSS personalizado
 st.markdown("""
-    
+<style>
     .metric-box {
         background-color: #f0f2f6;
         padding: 20px;
         border-radius: 10px;
         margin: 10px 0;
     }
-    
+</style>
 """, unsafe_allow_html=True)
 
 st.title("🎛️ Dashboard Interactivo - Control Total")

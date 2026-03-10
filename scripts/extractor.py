@@ -2,7 +2,6 @@
 import os
 import requests
 import json
-import time
 import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
@@ -91,7 +90,6 @@ class WeatherstackExtractor:
                 datos_procesados = self.procesar_respuesta(response)
                 if datos_procesados:
                     datos_extraidos.append(datos_procesados)
-            time.sleep(2)
         
         return datos_extraidos
 
