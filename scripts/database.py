@@ -22,6 +22,12 @@ DB_NAME = os.getenv("DB_NAME")
 Base = declarative_base()
 SKIP_SQLITE_POPULATION = os.getenv("SKIP_SQLITE_POPULATION", "0").lower() in ("1", "true", "yes")
 
+# Importamos los modelos para que SQLAlchemy registre las clases antes de crear tablas
+try:
+    from scripts import models  # noqa: F401
+except Exception as exc:
+    logger.warning("No se pudieron importar los modelos al iniciar la DB: %s", exc)
+
 
 def _postgres_url():
     if not all((DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)):
@@ -55,6 +61,7 @@ def _init_engine():
                 exc,
             )
     engine, sqlite_url = _create_sqlite_engine()
+    Base.metadata.create_all(bind=engine)
     return engine, sqlite_url, True
 
 
