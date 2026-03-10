@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 import requests
 import json
 import pandas as pd
@@ -90,6 +91,7 @@ class WeatherstackExtractor:
                 datos_procesados = self.procesar_respuesta(response)
                 if datos_procesados:
                     datos_extraidos.append(datos_procesados)
+            time.sleep(3)
         
         return datos_extraidos
 

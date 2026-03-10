@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
 import os
-import sys
 import requests
 import json
 import pandas as pd
 from datetime import datetime
 import time
-from pathlib import Path
 from dotenv import load_dotenv
 import logging
 from sqlalchemy.exc import IntegrityError
-
-# Permite ejecutar con `python scripts/extractor_db.py`
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.database import SessionLocal
 from scripts.models import Ciudad, RegistroClima, MetricasETL
@@ -171,6 +164,7 @@ class WeatherstackETL:
                     datos = self.procesar_respuesta(response)
                     if datos:
                         self.guardar_en_bd(datos)
+                time.sleep(3)
 
             # Determina estado
             estado = "SUCCESS" if self.registros_fallidos == 0 else "PARTIAL"
