@@ -3,6 +3,8 @@ import logging
 import os
 from pathlib import Path
 
+import pandas as pd
+
 from dotenv import load_dotenv
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.exc import OperationalError
@@ -22,11 +24,12 @@ DB_NAME = os.getenv("DB_NAME")
 Base = declarative_base()
 SKIP_SQLITE_POPULATION = os.getenv("SKIP_SQLITE_POPULATION", "0").lower() in ("1", "true", "yes")
 
-# Importamos los modelos para que SQLAlchemy registre las clases antes de crear tablas
 try:
     from scripts import models  # noqa: F401
+    from scripts.models import Ciudad, RegistroClima
 except Exception as exc:
     logger.warning("No se pudieron importar los modelos al iniciar la DB: %s", exc)
+    Ciudad = RegistroClima = None
 
 
 def _postgres_url():
@@ -74,14 +77,19 @@ except Exception as exc:
     logger.warning("No se pudo reflejar la metadata del motor: %s", exc)
 
 
-def _populate_local_db():
+def _get_ciudades_from_csv():
+    data_file = Path(__file__).resolve().parents[1] / "data" / "clima.csv"
+    if not data_file.exists():
+        return []
     try:
         import pandas as pd
-        from scripts.models import Ciudad, RegistroClima
-    except ImportError as exc:  # pragma: no cover
-        logger.warning("No se cargó pandas o los modelos; se omite la población local: %s", exc)
-        return
+        df = pd.read_csv(data_file, usecols=["ciudad"])
+        return [row["ciudad"] for _, row in df.dropna(subset=["ciudad"]).iterrows()]
+    except Exception:
+        return []
 
+
+def _populate_local_db():
     if SKIP_SQLITE_POPULATION:
         logger.info("SKIP_SQLITE_POPULATION set, omitiendo creación/población de la base local.")
         return
@@ -158,8 +166,30 @@ def _populate_local_db():
         session.close()
 
 
+def _ensure_minimum_cities_exist():
+    if Ciudad is None:
+        return
+    session = SessionLocal()
+    try:
+        if session.query(Ciudad).count() == 0:
+            nombres = [c.strip() for c in os.getenv("CIUDADES", "").split(",") if c.strip()]
+            if not nombres:
+                nombres = _get_ciudades_from_csv() or ["Bogota", "Cali", "Medellin", "Barranquilla", "Cartagena"]
+            for nombre in nombres:
+                ciudad = Ciudad(nombre=nombre, pais="Colombia", latitud=0.0, longitud=0.0)
+                session.add(ciudad)
+            session.commit()
+            logger.info("Se insertaron ciudades base desde CIUDADES para evitar el fallo inicial.")
+    except Exception as exc:
+        session.rollback()
+        logger.warning("No se pudieron crear ciudades base: %s", exc)
+    finally:
+        session.close()
+
+
 if USING_SQLITE_FALLBACK:
     _populate_local_db()
+    _ensure_minimum_cities_exist()
 
 
 def get_db():
