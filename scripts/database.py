@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -9,7 +10,11 @@ import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker
+
+# Permit running `python scripts/database.py` by exporting repo root
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
 
 load_dotenv()
 
@@ -22,15 +27,17 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_NAME = os.getenv("DB_NAME")
 
-Base = declarative_base()
+from scripts.base import Base
 SKIP_SQLITE_POPULATION = os.getenv("SKIP_SQLITE_POPULATION", "0").lower() in ("1", "true", "yes")
 
-try:
-    from scripts import models  # noqa: F401
-    from scripts.models import Ciudad, RegistroClima
-except Exception as exc:
-    logger.warning("No se pudieron importar los modelos al iniciar la DB: %s", exc)
-    Ciudad = RegistroClima = None
+
+def _load_models():
+    try:
+        from scripts.models import Ciudad, RegistroClima
+        return Ciudad, RegistroClima
+    except Exception as exc:
+        logger.warning("No se pudieron importar los modelos dinámicamente: %s", exc)
+        return None, None
 
 
 def _postgres_url():
@@ -93,6 +100,10 @@ def _get_ciudades_from_csv():
 def _populate_local_db():
     if SKIP_SQLITE_POPULATION:
         logger.info("SKIP_SQLITE_POPULATION set, omitiendo creación/población de la base local.")
+        return
+
+    Ciudad, RegistroClima = _load_models()
+    if Ciudad is None or RegistroClima is None:
         return
 
     data_file = Path(__file__).resolve().parents[1] / "data" / "clima.csv"
@@ -168,6 +179,7 @@ def _populate_local_db():
 
 
 def _ensure_minimum_cities_exist():
+    Ciudad, _ = _load_models()
     if Ciudad is None:
         return
     session = SessionLocal()

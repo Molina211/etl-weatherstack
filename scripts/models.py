@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy import ForeignKey, Index
 from sqlalchemy.orm import relationship
-from scripts.database import Base
+from scripts.base import Base
 
 class Ciudad(Base):
     """Modelo para ciudades"""
